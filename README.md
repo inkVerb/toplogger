@@ -58,12 +58,34 @@ rm -rf ~/rpmbuild
 
 ## Service Breakdown
 - This explains the two simple files that make this service work
-- These two files are the same for every architecture's installer package
+- The two files, plus one optional config, are the same for every architecture's installer package
+  - The `.service` file goes in `/usr/systemd/system/`, not `/etc/systemd/system/` [because this is part of a package](https://bbs.archlinux.org/viewtopic.php?id=171461)
+  - The `.sh` script is not intended to be executed from the command line, so it goes somewhere in `/lib/`
+    - `/lib/` is a symlink to `/usr/lib/` across most architectures, so we use `/usr/lib/` directly
+  - The config at `/etc/toplogger/conf`, if broken, has default contingencies in the `.sh` script
+    - This will be removed on a purge, but not a simple remove
+- The dependency is `systemd` since we are using systemd structure, not SysVinit or Upstart
 
 | **`toplogger.sh`** : (`/usr/lib/toplogger/toplogger.sh` - `755`)
 
 ```bash
 #!/bin/bash
+
+# Get conf setting if there
+if [ -f "/etc/toplogger/conf" ]; then
+  interval=$(grep interval_seconds /etc/toplogger/conf | awk '{print $2}')
+
+  # Wrong conf setting defaults to 60
+  if [ $interval -gt 3600 ] || [ $interval -lt 30 ]; then
+    interval=60    
+  fi
+else
+
+  # No conf defaults to 60
+  interval=60
+fi
+
+# The interval setting is done before the loop starts, so the script will need to be re-started before an config changes take effect; this means using `systemctl restart toplogger`
 
 # Start an infinite loop with `while :`
 while :; do
@@ -86,7 +108,7 @@ while :; do
     fi
   fi
   # Wait 60 seconds before looping again
-  sleep 60
+  sleep $interval
 done
 ```
 
@@ -97,16 +119,23 @@ done
 Description=top logger per-minute
 
 [Service]
-ExecStart=/usr/lib/toplogger/toplogger.sh # The script
+ExecStart=/usr/lib/toplogger/toplogger.sh  # The script
 
 [Install]
-WantedBy=network.target # Start looping as soon as the network starts, don't wait for multi-user
+WantedBy=network.target  # Start looping as soon as the network starts, don't wait for multi-user
+```
+
+- This third file is used as a config in `/etc/`
+  - If it does not exist, the script will default to `60`
+
+| **`conf`** : (`/etc/toplogger/conf`)
+
+```
+interval_seconds 60  # Must be an integer within 30 to 3600
 ```
 
 ## Detailed instructions per architecture
 Instructions explain each in detail to create these packages from scratch...
-
-- These instructions presume you can access [toplogger.sh](https://github.com/inkVerb/toplogger/blob/main/toplogger.sh).
 
 ### I. Arch Linux Package (`toplogger-1.0.0-1-any.pkg.tar.zst`)
 *Arch package directory structure:*
@@ -115,9 +144,10 @@ Instructions explain each in detail to create these packages from scratch...
 
 ```
 arch/
-├─PKGBUILD
-├─toplogger.service
-└─toplogger.sh
+├─ PKGBUILD
+├─ conf
+├─ toplogger.service
+└─ toplogger.sh
 ```
 
 - Create directory: `arch`
@@ -133,7 +163,7 @@ pkgdesc="top logs per-minute"
 url="https://github.com/inkVerb/toplogger"
 arch=('any')
 license=('GPL')
-depends=('top')
+depends=('systemd')
 source=("$pkgname.sh" "$pkgname.service")
 sha256sums=('SKIP' 'SKIP')
 
@@ -148,7 +178,7 @@ post_install() {
 }
 ```
 
-- Place files `toplogger.sh` & `toplogger.service` in the same directory as `PKGBUILD`
+- Place files `conf`, `toplogger.sh` & `toplogger.service` in the same directory as `PKGBUILD`
 - Build package:
   - Navigate to directory `arch/`
   - Run this, then the package will be built, then installed with `pacman`:
@@ -156,7 +186,7 @@ post_install() {
 | **Build & install Arch package** :$ (in one command)
 
 ```console
-makepkg -si
+makepkg -i
 ```
 
 - Use this to build and install in two steps:
@@ -164,13 +194,14 @@ makepkg -si
 | **Build, *then* install Arch package** :$ (first line produces the `.pkg.tar.zst` file for repos or manual install)
 
 ```console
-makepkg -s
+makepkg
 sudo pacman -U toplogger-1.0.0-1-any.pkg.tar.zst
 ```
 
 - Special notes about Arch:
-  - To resolve any dependencies, we use the `-s` flag with `makepkg` every time
-    - This may be necessary with Arch being so minimalist, `top` may not even be installed
+  - We don't need to use the `-s` flag with `makepkg` this time because of the singular dependency issue
+    - The `.service` structure needs `systemd`
+    - If `systemd` was not already in use, then it could be SysVinit or Upstart, which `systemd` should conflict with
   - The name of the directory containing the package files does not matter
   - `PKGBUILD` is the instruction file, not a directory as might be expected with other package builders
   - `makepkg` must be run from the same directory containing `PKGBUILD`
@@ -189,17 +220,22 @@ sudo pacman -R toplogger
 
 ```
 deb/
-└─toplogger/
-  ├─DEBIAN/
-  │ ├─control
-  │ └─postinst
-  └─usr/
-    └─lib/
-      ├─systemd/
-      │ └─system/
-      │   └─toplogger.service
-      └─toplogger/
-        └─toplogger.sh
+└─ toplogger/
+   ├─ DEBIAN/
+   │  ├─ control
+   │  ├─ postinst
+   │  ├─ postrm
+   │  └─ prerm
+   └─ usr/
+   │ └─ lib/
+   │     ├─ systemd/
+   │     │  └─ system/
+   │     │     └─ toplogger.service
+   │     └─ toplogger/
+   │        └─ toplogger.sh
+   └─ etc/
+      └─ toplogger/
+         └─ conf
 ```
 
 - Create directories: `deb/toplogger/DEBIAN`
@@ -214,7 +250,7 @@ Section: utils
 Priority: optional
 Architecture: all
 Maintainer: inkVerb <toplogger@inkisaverb.com>
-Depends: top
+Depends: systemd
 Description: top logs per-minute
 ```
 
@@ -232,15 +268,52 @@ set -e
 # git clone and move proper folder into place
 install -Dm755 /usr/lib/toplogger/toplogger.sh /usr/lib/toplogger/toplogger.sh
 install -Dm644 /usr/lib/systemd/system/toplogger.service /usr/lib/systemd/system/toplogger.service
+install -Dm644 /etc/toplogger/conf /etc/toplogger/conf
 
 # Service
 systemctl enable toplogger.service
 systemctl start toplogger.service
 ```
 
-- Create directories: `deb/toplogger/usr/lib/toplogger/` & `deb/toplogger/usr/lib/systemd/system/`
-- Place file `toplogger.sh` in `deb/penguinsay/usr/lib/toplogger/`
-- Place file `toplogger.service` in `deb/penguinsay/usr/lib/systemd/system/`
+- In `DEBIAN/` create file: `prerm`
+  - Make it executable with :$ `chmod +x DEBIAN/prerm`
+
+| **`deb/toplogger/DEBIAN/prerm`** : (disable services after remove)
+
+```
+#!/bin/bash
+
+# exit from any errors
+set -e
+
+systemctl stop toplogger
+systemctl disable toplogger
+
+```
+
+- In `DEBIAN/` create file: `postrm`
+  - Make it executable with :$ `chmod +x DEBIAN/postrm`
+
+| **`deb/toplogger/DEBIAN/postrm`** : (remove `/etc/` configs only on purge)
+
+```
+#!/bin/bash
+
+# exit from any errors
+set -e
+
+if [ "$1" = "purge" ]; then
+    rm -rf /etc/toplogger
+fi
+```
+
+- Create directories:
+  - `deb/toplogger/etc/toplogger/`
+  - `deb/toplogger/usr/lib/toplogger/`
+  - `deb/toplogger/usr/lib/systemd/system/`
+- Place file `conf` in `deb/toplogger/etc/toplogger/`
+- Place file `toplogger.sh` in `deb/toplogger/usr/lib/toplogger/`
+- Place file `toplogger.service` in `deb/toplogger/usr/lib/systemd/system/`
 - Build package:
   - Navigate to directory `deb/`
   - Run this, then the package will be built, then installed:
@@ -275,12 +348,13 @@ sudo apt-get remove toplogger
 
 ```
 rpm/
-└─rpmbuild/
-  ├─SPECS/
-  │ └─toplogger.spec
-  └─SOURCES/
-    ├─toplogger.service
-    └─toplogger.sh
+└─ rpmbuild/
+   ├─ SPECS/
+   │  └─ toplogger.spec
+   └─ SOURCES/
+      ├─ conf
+      ├─ toplogger.service
+      └─ toplogger.sh
 ```
 
 - Create directories: `rpm/rpmbuild/SPECS`
@@ -298,7 +372,7 @@ License:        GPL
 URL:            https://github.com/inkVerb/toplogger
 
 BuildArch:      noarch
-Requires:       top
+Requires:       systemd
 
 %description
 Service that keeps top logs every minute, per month, in /var/log/toplogger/
@@ -313,18 +387,34 @@ Other commands could go here...
 # We could put some commands here if we needed to build from source
 
 %install
-install -Dm755 "$RPM_BUILD_ROOT/usr/lib/toplogger"
-install -Dm755 "$RPM_BUILD_ROOT/usr/lib/systemd/system"
 install -Dm755 "$RPM_SOURCE_DIR/toplogger.sh" "$RPM_BUILD_ROOT/usr/lib/toplogger/toplogger.sh"
 install -Dm644 "$RPM_SOURCE_DIR/toplogger.service" "$RPM_BUILD_ROOT/usr/lib/systemd/system/toplogger.service"
+install -Dm644 "$RPM_SOURCE_DIR/conf" "$RPM_BUILD_ROOT/etc/toplogger/conf"
+
+%post
+systemctl daemon-reload
+systemctl enable toplogger
+systemctl start toplogger
+
+%preun
+if [ $1 -eq 0 ]; then
+  systemctl stop toplogger
+  systemctl disable toplogger
+  systemctl daemon-reload
+fi
+
+%postun
+if [ $1 -eq 0 ]; then
+  rm -rf /etc/toplogger
+fi
 
 %files
 /usr/lib/toplogger/toplogger.sh
 /usr/lib/systemd/system/toplogger.service
+/etc/toplogger/conf
 
-%post
-systemctl enable toplogger.service
-systemctl start toplogger.service
+%config(noreplace)
+/etc/toplogger/conf
 
 %changelog
 * Thu Jan 01 1970 Jesse <toplogger@inkisaverb.com> - 1.0.0-1
@@ -332,7 +422,7 @@ systemctl start toplogger.service
 ```
 
 - Create directory: `rpm/rpmbuild/SOURCES/`
-- Place files `toplogger.sh` & `toplogger.service` in directory `rpm/rpmbuild/SOURCES/`
+- Place files `conf`, `toplogger.sh` & `toplogger.service` in directory `rpm/rpmbuild/SOURCES/`
 - Install the `rpm-build` and `rpmdevtools` packages
 
 | **RedHat/CentOS** :$

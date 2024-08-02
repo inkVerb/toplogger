@@ -2,8 +2,7 @@ Package: toplogger
 Version: 1.0.0
 Section: base
 Priority: optional
-#Architecture: amd64
 Architecture: all
 Maintainer: inkVerb <toplogger@inkisaverb.com>
-Depends: bash (>= 4.0)
+Depends: systemd
 Description: top logs per-minute

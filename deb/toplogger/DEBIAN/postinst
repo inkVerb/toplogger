@@ -5,8 +5,10 @@ set -e
 
 # git clone and move proper folder into place
 install -Dm755 /usr/lib/toplogger/toplogger.sh /usr/lib/toplogger/toplogger.sh
-install -Dm644 /lib/systemd/system/toplogger.service /lib/systemd/system/toplogger.service
+install -Dm644 /usr/lib/systemd/system/toplogger.service /usr/lib/systemd/system/toplogger.service
+install -Dm644 /etc/toplogger/conf /etc/toplogger/conf
 
 # Service
-systemctl enable toplogger.service
-systemctl start toplogger.service
+systemctl daemon-reload
+systemctl enable toplogger
+systemctl start toplogger

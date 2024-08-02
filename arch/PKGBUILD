@@ -2,19 +2,19 @@ pkgname=toplogger
 pkgver=1.0.0
 pkgrel=1
 pkgdesc="top logs per-minute"
-url="https://github.com/inkVerb/toplogger"
+url="https://github.com/inkVerb/$pkgname"
 arch=('any')
 license=('GPL')
-depends=('top')
-source=("$pkgname.sh" "$pkgname.service")
-sha256sums=('SKIP' 'SKIP')
+depends=('systemd')
+source=("$pkgname.sh" "$pkgname.service" "conf")
+sha256sums=('SKIP' 'SKIP' 'SKIP')
+# Preserve when uninstalled, delete when purged
+backup=('etc/toplogger/conf')
 
 package() {
+
   install -Dm755 "$srcdir/$pkgname.sh" "$pkgdir/usr/lib/$pkgname/$pkgname.sh"
   install -Dm644 "$srcdir/$pkgname.service" "$pkgdir/usr/lib/systemd/system/$pkgname.service"
-}
-
-post_install() {
-  systemctl enable $pkgname.service
-  systemctl start $pkgname.service
+  install -Dm644 "$srcdir/conf" "$pkgdir/etc/$pkgname/conf"
+  
 }

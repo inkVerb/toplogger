@@ -1,0 +1,1 @@
+interval_seconds 60  # Must be an integer within 30 to 3600

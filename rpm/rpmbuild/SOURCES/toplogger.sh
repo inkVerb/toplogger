@@ -1,5 +1,14 @@
 #!/bin/bash
 
+if [ -f "/etc/toplogger/conf" ]; then
+  interval=$(grep interval_seconds /etc/toplogger/conf | awk '{print $2}')
+  if [ $interval -gt 3600 ] || [ $interval -lt 30 ]; then
+    interval=60    
+  fi
+else
+  interval=60
+fi
+
 while :; do
   /usr/bin/mkdir -p /var/log/toplogger
   if [ -d "/var/log/toplogger" ]; then
@@ -15,5 +24,5 @@ while :; do
       top -b -n 1 > /var/log/toplogger/${this_month}/${time_stamp}
     fi
   fi
-  sleep 60
+  sleep $interval
 done
