@@ -1,0 +1,8 @@
+[Unit]
+Description=top logger per-minute
+
+[Service]
+ExecStart=/usr/lib/toplogger/toplogger.sh
+
+[Install]
+WantedBy=network.target

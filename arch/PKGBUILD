@@ -1,0 +1,20 @@
+pkgname=toplogger
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="top logs per-minute"
+url="https://github.com/inkVerb/toplogger"
+arch=('any')
+license=('GPL')
+depends=('top')
+source=("$pkgname.sh" "$pkgname.service")
+sha256sums=('SKIP' 'SKIP')
+
+package() {
+  install -Dm755 "$srcdir/$pkgname.sh" "$pkgdir/usr/lib/$pkgname/$pkgname.sh"
+  install -Dm644 "$srcdir/$pkgname.service" "$pkgdir/usr/lib/systemd/system/$pkgname.service"
+}
+
+post_install() {
+  systemctl enable $pkgname.service
+  systemctl start $pkgname.service
+}
