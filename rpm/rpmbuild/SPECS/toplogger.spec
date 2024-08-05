@@ -22,12 +22,11 @@ Other commands could go here...
 # We could put some commands here if we needed to build from source
 
 %install
-# We shouldn't need to create directories that will be created with other install commands, but for ref in dev keep for now
-#install -Dm755 "$RPM_BUILD_ROOT/usr/lib/toplogger"
-#install -Dm755 "$RPM_BUILD_ROOT/usr/lib/systemd/system"
 install -Dm755 "$RPM_SOURCE_DIR/toplogger.sh" "$RPM_BUILD_ROOT/usr/lib/toplogger/toplogger.sh"
 install -Dm644 "$RPM_SOURCE_DIR/toplogger.service" "$RPM_BUILD_ROOT/usr/lib/systemd/system/toplogger.service"
 install -Dm644 "$RPM_SOURCE_DIR/conf" "$RPM_BUILD_ROOT/etc/toplogger/conf"
+
+echo "/var/log/toplogger  # Directory where logs are sorted and kept" > "$RPM_BUILD_ROOT/etc/toplogger/logdir"
 
 %post
 systemctl daemon-reload
@@ -50,9 +49,11 @@ fi
 /usr/lib/toplogger/toplogger.sh
 /usr/lib/systemd/system/toplogger.service
 /etc/toplogger/conf
+/etc/toplogger/logdir
 
 %config(noreplace)
 /etc/toplogger/conf
+/etc/toplogger/logdir
 
 %changelog
 * Thu Jan 01 1970 Jesse <toplogger@inkisaverb.com> - 1.0.0-1

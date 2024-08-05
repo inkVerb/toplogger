@@ -8,6 +8,8 @@ install -Dm755 /usr/lib/toplogger/toplogger.sh /usr/lib/toplogger/toplogger.sh
 install -Dm644 /usr/lib/systemd/system/toplogger.service /usr/lib/systemd/system/toplogger.service
 install -Dm644 /etc/toplogger/conf /etc/toplogger/conf
 
+echo "/var/log/toplogger  # Directory where logs are sorted and kept" > "$pkgdir/etc/toplogger/logdir"
+
 # Service
 systemctl daemon-reload
 systemctl enable toplogger
