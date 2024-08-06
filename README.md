@@ -331,22 +331,6 @@ systemctl enable toplogger
 systemctl start toplogger
 ```
 
-- In `DEBIAN/` create file: `postrm`
-  - Make it executable with :$ `chmod +x DEBIAN/postrm`
-
-| **`deb/toplogger/DEBIAN/postrm`** : (remove `/etc/` configs only on package purge)
-
-```
-#!/bin/bash
-
-# exit from any errors
-set -e
-
-if [ "$1" = "purge" ]; then
-    rm -rf /etc/toplogger
-fi
-```
-
 - In `DEBIAN/` create file: `prerm`
   - Make it executable with :$ `chmod +x DEBIAN/prerm`
 
@@ -360,6 +344,22 @@ set -e
 
 systemctl stop toplogger
 systemctl disable toplogger
+```
+
+- In `DEBIAN/` create file: `postrm`
+  - Make it executable with :$ `chmod +x DEBIAN/postrm`
+
+| **`deb/toplogger/DEBIAN/postrm`** : (remove `/etc/` configs only on package purge)
+
+```
+#!/bin/bash
+
+# exit from any errors
+set -e
+
+if [ "$1" = "purge" ]; then
+  rm -rf /etc/toplogger
+fi
 ```
 
 - Create directories:
