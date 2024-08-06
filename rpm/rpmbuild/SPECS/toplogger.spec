@@ -48,13 +48,12 @@ fi
 %files
 /usr/lib/toplogger/toplogger.sh
 /usr/lib/systemd/system/toplogger.service
-/etc/toplogger/conf
-/etc/toplogger/logdir
 
 %config(noreplace)
 /etc/toplogger/conf
 /etc/toplogger/logdir
 
 %changelog
-* Thu Jan 01 1970 Jesse <toplogger@inkisaverb.com> - 1.0.0-1
-- Something started
+-------------------------------------------------------------------
+Thu Jan 01 00:00:00 UTC 1970 501webapp@inkisaverb.com
+- Something started, probably with v1.0.0-1

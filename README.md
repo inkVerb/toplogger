@@ -58,12 +58,13 @@ rm -rf ~/rpmbuild
 
 ## Service Breakdown
 - This explains the two simple files that make this service work
-- The two files, plus one optional config, are the same for every architecture's installer package
+- The two files, plus two optional configs, are the same for every architecture's installer package
   - The `.service` file goes in `/usr/systemd/system/`, not `/etc/systemd/system/` [because this is part of a package](https://bbs.archlinux.org/viewtopic.php?id=171461)
   - The `.sh` script is not intended to be executed from the command line, so it goes somewhere in `/lib/`
     - `/lib/` is a symlink to `/usr/lib/` across most architectures, so we use `/usr/lib/` directly
-  - The config at `/etc/toplogger/conf`, if broken, has default contingencies in the `.sh` script
-    - This will be removed on a purge, but not a simple remove
+  - The configs at `/etc/toplogger/conf` & `/etc/toplogger/logdir`, if broken, have default contingencies in the `.sh` script
+    - *If changed*, they will be removed on a purge, but not a simple remove
+    - If they are not changed, then the package manager will recognize them from the files that shipped and remove them when the package is removed
 - The dependency is `systemd` since we are using systemd structure, not SysVinit or Upstart
 
 | **`toplogger.sh`** : (`/usr/lib/toplogger/toplogger.sh` - `755`)
@@ -85,26 +86,35 @@ else
   interval=60
 fi
 
+# Get directory setting if there
+if [ -f "/etc/toplogger/logdir" ]; then
+  logdir=$(cat /etc/toplogger/logdir | awk '{print $1}')
+else
+
+  # No conf defaults to /var/log/toplogger
+  logdir="/var/log/toplogger"
+fi
+
 # The interval setting is done before the loop starts, so the script will need to be re-started before an config changes take effect; this means using `systemctl restart toplogger`
 
 # Start an infinite loop with `while :`
 while :; do
   # Always ensure the directory exists
-  /usr/bin/mkdir -p /var/log/toplogger
-  if [ -d "/var/log/toplogger" ]; then
+  /usr/bin/mkdir -p $logdir
+  if [ -d "$logdir" ]; then
     # Set some important dates with command substitutes inside command substitutes
     this_month=`/usr/bin/date -d "$(/usr/bin/date +%Y-%m-1) 0 month" +%B`
     last_month=`/usr/bin/date -d "$(/usr/bin/date +%Y-%m-1) -1 month" +%B`
     last_last_month=`/usr/bin/date -d "$(/usr/bin/date +%Y-%m-1) -2 month" +%B`
     time_stamp="$(/usr/bin/date +%Y-%m-%d_%H:%M:%S)"
-    /usr/bin/mkdir -p /var/log/toplogger/${this_month}
+    /usr/bin/mkdir -p $logdir/${this_month}
     # Remove logs older than one month
-    if [ ! -d "/var/log/toplogger/${this_month}" ] && [ -d "/var/log/toplogger/${last_month}" ]; then
-      /usr/bin/rm -rf /var/log/toplogger/${last_last_month}
+    if [ ! -d "$logdir/${this_month}" ] && [ -d "$logdir/${last_month}" ]; then
+      /usr/bin/rm -rf $logdir/${last_last_month}
     fi
     # Make the log from one, single `top` iteration
-    if [ -d "/var/log/toplogger" ]; then
-      top -b -n 1 > /var/log/toplogger/${this_month}/${time_stamp}
+    if [ -d "$logdir" ]; then
+      top -b -n 1 > $logdir/${this_month}/${time_stamp}
     fi
   fi
   # Wait 60 seconds before looping again
@@ -127,11 +137,23 @@ WantedBy=network.target  # Start looping as soon as the network starts, don't wa
 
 - This third file is used as a config in `/etc/`
   - If it does not exist, the script will default to `60`
+  - It is included in the package and copied into place
 
 | **`conf`** : (`/etc/toplogger/conf`)
 
 ```
+# This is a config file for toplogger
 interval_seconds 60  # Must be an integer within 30 to 3600
+```
+
+- This fourth file is used as a config in `/etc/`
+  - If it does not exist, the script will default to `/var/log/toplogger`
+  - It is not included in the package, but is created using `echo`
+
+| **`logdir`** : (`/etc/toplogger/logdir`)
+
+```
+/var/log/toplogger  # Directory where logs are sorted and kept
 ```
 
 ## Detailed instructions per architecture
@@ -164,17 +186,19 @@ url="https://github.com/inkVerb/toplogger"
 arch=('any')
 license=('GPL')
 depends=('systemd')
-source=("$pkgname.sh" "$pkgname.service")
-sha256sums=('SKIP' 'SKIP')
+source=("$pkgname.sh" "$pkgname.service" "conf")
+sha256sums=('SKIP' 'SKIP' 'SKIP')
+# Preserve when uninstalled, delete when purged
+backup=("etc/$pkgname/conf" "etc/$pkgname/logdir")
 
 package() {
+
   install -Dm755 "$srcdir/$pkgname.sh" "$pkgdir/usr/lib/$pkgname/$pkgname.sh"
   install -Dm644 "$srcdir/$pkgname.service" "$pkgdir/usr/lib/systemd/system/$pkgname.service"
-}
-
-post_install() {
-  systemctl enable $pkgname.service
-  systemctl start $pkgname.service
+  install -Dm644 "$srcdir/conf" "$pkgdir/etc/$pkgname/conf"
+  
+  echo "/var/log/$pkgname  # Directory where logs are sorted and kept" > "$pkgdir/etc/$pkgname/logdir"
+  
 }
 ```
 
@@ -199,6 +223,19 @@ sudo pacman -U toplogger-1.0.0-1-any.pkg.tar.zst
 ```
 
 - Special notes about Arch:
+  - `systemctl` cannot enable, start, stop, or disable the service from the package installation
+    - This is because of the way that `pacman` uses `chroot` to install the package
+    - The service will need to be enabled, started, stopped, disabled and removed manually *after* the installation or removal
+      - `systemctl enable toplogger`, `systemctl start toplogger`, `systemctl stop toplogger`, `systemctl disable toplogger`
+    - This relates to the nature for Arch Linux to be minimalist, part of its appeal to some developers
+      - There may be a work-around that includes a "post install" script and "install hook", but it must also disable the service on package removal, making it very complex to have the package manager handle `systemctl` service status changes
+      - This is why many Arch Linux system administrators handle both packages and services separately
+  - Files in the `backup=` array (in `PKGBUILD`) are handled in a special way on package removal or package upgrade
+    - This only affects files that have been changed from those shipped
+    - `backup=` files are copied to `.pacsave` files in the same directory on removal
+    - `backup=` files are ignored on a package upgrade
+    - This is different from Debian, which will merely ignore the files, not move altered files to backups
+      - This relates to the nature for Arch Linux to be minimalist, part of its appeal to some developers
   - We don't need to use the `-s` flag with `makepkg` this time because of the singular dependency issue
     - The `.service` structure needs `systemd`
     - If `systemd` was not already in use, then it could be SysVinit or Upstart, which `systemd` should conflict with
@@ -207,10 +244,16 @@ sudo pacman -U toplogger-1.0.0-1-any.pkg.tar.zst
   - `makepkg` must be run from the same directory containing `PKGBUILD`
   - The `.pkg.tar.zst` file will appear inside the containing directory
 
-| **Uninstall Arch package** :$ (optional)
+| **Remove Arch package** :$ (optional)
 
 ```console
 sudo pacman -R toplogger
+```
+
+| **Purge Arch package** :$ (optional)
+
+```console
+sudo pacman -Rsn toplogger
 ```
 
 ### II. Debian Package (`toplogger.deb`)
@@ -222,6 +265,7 @@ sudo pacman -R toplogger
 deb/
 └─ toplogger/
    ├─ DEBIAN/
+   │  ├─ conffiles
    │  ├─ control
    │  ├─ postinst
    │  ├─ postrm
@@ -240,6 +284,7 @@ deb/
 
 - Create directories: `deb/toplogger/DEBIAN`
 - In `DEBIAN/` create file: `control`
+  - Make it executable with :$ `chmod +x DEBIAN/postinst`
 
 | **`deb/toplogger/DEBIAN/control`** :
 
@@ -252,6 +297,15 @@ Architecture: all
 Maintainer: inkVerb <toplogger@inkisaverb.com>
 Depends: systemd
 Description: top logs per-minute
+
+```
+
+- In `DEBIAN/` create file: `conffiles`
+
+| **`deb/toplogger/DEBIAN/conffiles`** : (retain these `/etc/` configs on package removal)
+
+```
+/etc/toplogger/conf
 ```
 
 - In `DEBIAN/` create file: `postinst`
@@ -265,14 +319,32 @@ Description: top logs per-minute
 # exit from any errors
 set -e
 
-# git clone and move proper folder into place
-install -Dm755 /usr/lib/toplogger/toplogger.sh /usr/lib/toplogger/toplogger.sh
-install -Dm644 /usr/lib/systemd/system/toplogger.service /usr/lib/systemd/system/toplogger.service
-install -Dm644 /etc/toplogger/conf /etc/toplogger/conf
+# Create our config that does not reside in the package
+echo "/var/log/toplogger  # Directory where logs are sorted and kept" > "/etc/toplogger/logdir"
+
+# Make the loop script executable
+chmod +x /usr/lib/toplogger/toplogger.sh
 
 # Service
-systemctl enable toplogger.service
-systemctl start toplogger.service
+systemctl daemon-reload
+systemctl enable toplogger
+systemctl start toplogger
+```
+
+- In `DEBIAN/` create file: `postrm`
+  - Make it executable with :$ `chmod +x DEBIAN/postrm`
+
+| **`deb/toplogger/DEBIAN/postrm`** : (remove `/etc/` configs only on package purge)
+
+```
+#!/bin/bash
+
+# exit from any errors
+set -e
+
+if [ "$1" = "purge" ]; then
+    rm -rf /etc/toplogger
+fi
 ```
 
 - In `DEBIAN/` create file: `prerm`
@@ -288,23 +360,6 @@ set -e
 
 systemctl stop toplogger
 systemctl disable toplogger
-
-```
-
-- In `DEBIAN/` create file: `postrm`
-  - Make it executable with :$ `chmod +x DEBIAN/postrm`
-
-| **`deb/toplogger/DEBIAN/postrm`** : (remove `/etc/` configs only on purge)
-
-```
-#!/bin/bash
-
-# exit from any errors
-set -e
-
-if [ "$1" = "purge" ]; then
-    rm -rf /etc/toplogger
-fi
 ```
 
 - Create directories:
@@ -326,17 +381,40 @@ sudo dpkg -i toplogger.deb  # Install the package
 ```
 
 - Special notes about Debian
+  - `systemctl` will enable, start, stop, or disable the service through the package installation
+    - This is because of how `dpkg` handles the packages
+    - This handling method is one of the appeals to Debian for some developers
+  - Config files are listed in `DEBIAN/conffiles`
+    - These files will be ignored on package upgrade or removal
+      - Config files will be preserved *even if not changed*, unlike Arch Linux
+      - This preserves original files, not moving them to backup copies as with Arch Linux
+      - This handling method is one of the appeals to Debian for some developers
+    - These files will be removed on package purge
+      - Package purge considers both `conffiles` & `postrm`
+        - Without `postrm`, removing the package will attempt to remove everything created at install
+        - Contents listed in `conffiles` will be left in place without the `--purge` flag for `apt remove`
+        - Because we add `/etc/toplogger/logdir` apart from files included with the package, `apt remove --purge` will not delete `/etc/toplogger/` without `postrm` explicitly running `rm -rf /etc/toplogger`
+          - Test this by removing the file `DEBIAN/postrm`, rebuild with `dpkg-deb --build`, then `sudo apt remove --purge toplogger`; an error will explain why `/etc/toplogger` was not removed
+    - Only files that reside within the package can be listed here
+    - The only config file allowed in `conffiles` is `/etc/toplogger/conf`
+    - `/etc/toplogger/logdir` is created via `echo`, not residing in the package, so it can't be listed in `conffiles`
   - The script file at `usr/lib/toplogger/toplogger.sh` does not need to be executable
     - This is because this installer uses a `postinst` script
-    - This script will set the permissions in the command `install -Dm755`
+    - This script will set the permissions in the command `chmod +x /usr/lib/toplogger/toplogger.sh`
   - The directory of the package files (`toplogger/`) will be the same as the package installer's `.deb` basename
   - The package installer will appear at `toplogger.deb` in the same directory as (`toplogger/`) regardless of the PWD from where the `dpkg-deb --build` command was run
     - For `deb/toplogger` it will be at `deb/toplogger.deb`
 
-| **Uninstall Debian package** :$ (optional)
+| **Remove Debian package** :$ (optional)
 
 ```console
 sudo apt-get remove toplogger
+```
+
+| **Purge Debian package** :$ (optional)
+
+```console
+sudo apt-get remove --purge toplogger
 ```
 
 ### III. RPM Package (`toplogger-1.0.0-1.noarch.rpm`)
@@ -391,6 +469,8 @@ install -Dm755 "$RPM_SOURCE_DIR/toplogger.sh" "$RPM_BUILD_ROOT/usr/lib/toplogger
 install -Dm644 "$RPM_SOURCE_DIR/toplogger.service" "$RPM_BUILD_ROOT/usr/lib/systemd/system/toplogger.service"
 install -Dm644 "$RPM_SOURCE_DIR/conf" "$RPM_BUILD_ROOT/etc/toplogger/conf"
 
+echo "/var/log/toplogger  # Directory where logs are sorted and kept" > "$RPM_BUILD_ROOT/etc/toplogger/logdir"
+
 %post
 systemctl daemon-reload
 systemctl enable toplogger
@@ -411,14 +491,15 @@ fi
 %files
 /usr/lib/toplogger/toplogger.sh
 /usr/lib/systemd/system/toplogger.service
-/etc/toplogger/conf
 
 %config(noreplace)
 /etc/toplogger/conf
+/etc/toplogger/logdir
 
 %changelog
-* Thu Jan 01 1970 Jesse <toplogger@inkisaverb.com> - 1.0.0-1
-- Something started
+-------------------------------------------------------------------
+Thu Jan 01 00:00:00 UTC 1970 501webapp@inkisaverb.com
+- Something started, probably with v1.0.0-1
 ```
 
 - Create directory: `rpm/rpmbuild/SOURCES/`
@@ -453,19 +534,34 @@ sudo rpm -i ~/rpmbuild/RPMS/noarch/toplogger-1.0.0-1.noarch.rpm  # Install the p
 ```
 
 - Special notes about RPM:
+  - `systemctl` will enable, start, stop, or disable the service through the package installation
+    - This is because of how `rpm` handles the packages
   - RPM requires the build be done from `~/rpmbuild/`
   - The resulting `.rpm` fill will be at: `~/rpmbuild/RPMS/noarch/toplogger-1.0.0-1.noarch.rpm`
     - This file might actually have a different name, but should be in the same directory (`~/rpmbuild/RPMS/noarch/`)
   - `noarch` means it works on any architecture
     - This part of the filename was set in the `.spec` file with `BuildArch: noarch`
+  - Config files listed in the `.spec` file under `%config(noreplace)` should not also be listed under `%files`
+  - Some `.spec` file variables could have interchangable names:
+    - `$RPM_SOURCE_DIR` = `%{_sourcedir}`
+    - `$RPM_BUILD_ROOT` = `%{buildroot}`
+    - `$RPM_SOURCE_DIR` & `$RPM_BUILD_ROOT` are "officially" supported
+    - Which one you use can make a difference, depending on other things done in the `.spec` file
+  - Purge and config preservation are are handled automatically, so there is no separate option for "purge"
+    - Configs listed in the `.spec` file under `%config(noreplace)` have no guarantee of being preserved on package removal
+      - These are listed here to protect them during package updates, not package removal
+    - To overwrite preserved configs on a re-install, use `install -f` for "force" when installing again
+  - The `%changelog` is for OpenSUSE's `zypper`
+    - RedHat/CentOS may want the date line like this:
+      - `* Thu Jan 01 1970 Jesse <501webapp@inkisaverb.com> - 1.0.0-1`
 
-| **Uninstall RedHat/CentOS package** :$ (optional)
+| **Remove RedHat/CentOS package** :$ (optional)
 
 ```console
 sudo dnf remove toplogger
 ```
 
-| **Uninstall OpenSUSE package** :$ (optional)
+| **Remove OpenSUSE package** :$ (optional)
 
 ```console
 sudo zypper remove toplogger

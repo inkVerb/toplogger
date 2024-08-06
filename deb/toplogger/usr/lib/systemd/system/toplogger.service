@@ -3,6 +3,7 @@ Description=top logger per-minute
 
 [Service]
 ExecStart=/usr/lib/toplogger/toplogger.sh
+Restart=always
 
 [Install]
 WantedBy=network.target

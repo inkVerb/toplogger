@@ -3,6 +3,7 @@ Description=top logger per-minute
 
 [Service]
 ExecStart=/usr/lib/toplogger/toplogger.sh  # The script
+Restart=always
 
 [Install]
 WantedBy=network.target  # Start looping as soon as the network starts, don't wait for multi-user
