@@ -55,5 +55,5 @@ fi
 
 %changelog
 -------------------------------------------------------------------
-Thu Jan 01 00:00:00 UTC 1970 501webapp@inkisaverb.com
+Thu Jan 01 00:00:00 UTC 1970 codes@inkisaverb.com
 - Something started, probably with v1.0.0-1

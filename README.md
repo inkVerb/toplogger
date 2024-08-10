@@ -178,6 +178,7 @@ arch/
 | **`arch/PKGBUILD`** :
 
 ```
+# Maintainer: Ink Is A Verb <codes@inkisaverb.com>
 pkgname=toplogger
 pkgver=1.0.0
 pkgrel=1
@@ -294,7 +295,7 @@ Version: 1.0.0
 Section: utils
 Priority: optional
 Architecture: all
-Maintainer: inkVerb <toplogger@inkisaverb.com>
+Maintainer: Ink Is A Verb <codes@inkisaverb.com>
 Depends: systemd
 Description: top logs per-minute
 
@@ -498,7 +499,7 @@ fi
 
 %changelog
 -------------------------------------------------------------------
-Thu Jan 01 00:00:00 UTC 1970 501webapp@inkisaverb.com
+Thu Jan 01 00:00:00 UTC 1970 codes@inkisaverb.com
 - Something started, probably with v1.0.0-1
 ```
 
@@ -553,7 +554,7 @@ sudo rpm -i ~/rpmbuild/RPMS/noarch/toplogger-1.0.0-1.noarch.rpm  # Install the p
     - To overwrite preserved configs on a re-install, use `install -f` for "force" when installing again
   - The `%changelog` is for OpenSUSE's `zypper`
     - RedHat/CentOS may want the date line like this:
-      - `* Thu Jan 01 1970 Jesse <501webapp@inkisaverb.com> - 1.0.0-1`
+      - `* Thu Jan 01 1970 Ink Is A Verb <codes@inkisaverb.com> - 1.0.0-1`
 
 | **Remove RedHat/CentOS package** :$ (optional)
 
