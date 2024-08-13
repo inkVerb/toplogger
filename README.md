@@ -285,7 +285,6 @@ deb/
 
 - Create directories: `deb/toplogger/DEBIAN`
 - In `DEBIAN/` create file: `control`
-  - Make it executable with :$ `chmod +x DEBIAN/postinst`
 
 | **`deb/toplogger/DEBIAN/control`** :
 
