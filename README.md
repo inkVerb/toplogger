@@ -60,8 +60,8 @@ rm -rf ~/rpmbuild
 ```
 
 ## Service Breakdown
-- This explains the two simple files that make this service work
-- The two files, plus two optional configs and the AppArmor profile, are the same for every architecture's installer package
+- The `top` command will record one iteration every minute in a month-based directory in `/var/log/toplogger/...`
+- The two files, plus two optional configs, and the AppArmor profile, are the same for every architecture's installer package
   - The `.service` file goes in `/usr/systemd/system/`, not `/etc/systemd/system/` [because this is part of a package](https://bbs.archlinux.org/viewtopic.php?id=171461)
   - The `.sh` script is not intended to be executed from the command line, so it goes somewhere in `/usr/lib/`
     - `/lib/` is a symlink to `/usr/lib/` across most architectures, so we use `/usr/lib/` directly
@@ -72,6 +72,28 @@ rm -rf ~/rpmbuild
     - The profile files are usually named after the primary executable file's location they govern
       - `usr.lib.toplogger.toplogger.sh` (for `/usr/lib/toplogger/toplogger.sh`)
 - The dependency is `systemd` since we are using systemd structure, not SysVinit or Upstart
+
+Directory sctructure of files in place:
+
+```
+└─ /
+   ├─ usr/
+   │ └─ lib/
+   │     ├─ systemd/
+   │     │  └─ system/
+   │     │     └─ toplogger.service
+   │     └─ toplogger/
+   │        └─ toplogger.sh
+   ├─ etc/
+   │  ├─ apparmor.d/
+   │  │  └─ usr.lib.toplogger.toplogger.sh
+   │  └─ toplogger/
+   │     ├─ conf
+   │     └─ logdir
+   └─ var/
+      └─ log/
+         └─ toplogger/
+```
 
 | **`toplogger.sh`** : (`/usr/lib/toplogger/toplogger.sh` - `755`)
 
@@ -145,7 +167,7 @@ WantedBy=network.target  # Start looping as soon as the network starts, don't wa
   - If it does not exist, the script will default to `60`
   - It is included in the package and copied into place
 
-| **`conf`** : (`/etc/toplogger/conf`)
+| **`conf`** : (`/etc/toplogger/conf` - `644`)
 
 ```
 # This is a config file for toplogger
@@ -156,13 +178,13 @@ interval_seconds 60  # Must be an integer within 30 to 3600
   - If it does not exist, the script will default to `/var/log/toplogger`
   - It is not included in the package, but is created using `echo`
 
-| **`logdir`** : (`/etc/toplogger/logdir`)
+| **`logdir`** : (`/etc/toplogger/logdir` - `644`)
 
 ```
 /var/log/toplogger  # Directory where logs are sorted and kept
 ```
 
-| **`usr.lib.toplogger.toplogger.sh`** : (AppArmor profile at `/etc/apparmor.d/usr.lib.toplogger.toplogger.sh`)
+| **`usr.lib.toplogger.toplogger.sh`** : (AppArmor profile at `/etc/apparmor.d/usr.lib.toplogger.toplogger.sh` - `644`)
 
 ```
 #include <tunables/global>
@@ -329,7 +351,7 @@ deb/
    │  ├─ postinst
    │  ├─ postrm
    │  └─ prerm
-   └─ usr/
+   ├─ usr/
    │ └─ lib/
    │     ├─ systemd/
    │     │  └─ system/
