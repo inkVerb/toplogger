@@ -13,3 +13,7 @@ chmod +x /usr/lib/toplogger/toplogger.sh
 systemctl daemon-reload
 systemctl enable toplogger
 systemctl start toplogger
+
+# AppArmor
+apparmor_parser -r /etc/apparmor.d/usr.lib.toplogger.toplogger.sh
+aa-enforce /etc/apparmor.d/usr.lib.toplogger.toplogger.sh

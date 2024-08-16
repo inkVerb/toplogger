@@ -1,6 +1,6 @@
 # toplogger
 ## `top` logger per-minute
-*Service that keeps `top` logs every minute, per month, in `/var/log/toplogger/`*
+*Service that keeps `top` logs every minute, per month, in `/var/log/toplogger/`, protected by AppArmor*
 
 ## Create the simple Linux install package for `toplogger`
 This is a guide to create an installer package for the `toplogger` service on:
@@ -18,6 +18,9 @@ Working examples for each already resides in this repository
 git clone https://github.com/inkVerb/toplogger.git
 cd toplogger/arch
 makepkg -si
+
+sudo systemctl enable toplogger
+sudo systemctl start toplogger
 ```
 
 | **Debian** :$ (& Ubuntu, Kali, Mint)
@@ -58,13 +61,16 @@ rm -rf ~/rpmbuild
 
 ## Service Breakdown
 - This explains the two simple files that make this service work
-- The two files, plus two optional configs, are the same for every architecture's installer package
+- The two files, plus two optional configs and the AppArmor profile, are the same for every architecture's installer package
   - The `.service` file goes in `/usr/systemd/system/`, not `/etc/systemd/system/` [because this is part of a package](https://bbs.archlinux.org/viewtopic.php?id=171461)
-  - The `.sh` script is not intended to be executed from the command line, so it goes somewhere in `/lib/`
+  - The `.sh` script is not intended to be executed from the command line, so it goes somewhere in `/usr/lib/`
     - `/lib/` is a symlink to `/usr/lib/` across most architectures, so we use `/usr/lib/` directly
   - The configs at `/etc/toplogger/conf` & `/etc/toplogger/logdir`, if broken, have default contingencies in the `.sh` script
     - *If changed*, they will be removed on a purge, but not a simple remove
     - If they are not changed, then the package manager will recognize them from the files that shipped and remove them when the package is removed
+  - AppArmor profiles are stored in `/etc/apparmor.d/`
+    - The profile files are usually named after the primary executable file's location they govern
+      - `usr.lib.toplogger.toplogger.sh` (for `/usr/lib/toplogger/toplogger.sh`)
 - The dependency is `systemd` since we are using systemd structure, not SysVinit or Upstart
 
 | **`toplogger.sh`** : (`/usr/lib/toplogger/toplogger.sh` - `755`)
@@ -156,6 +162,34 @@ interval_seconds 60  # Must be an integer within 30 to 3600
 /var/log/toplogger  # Directory where logs are sorted and kept
 ```
 
+| **`usr.lib.toplogger.toplogger.sh`** : (AppArmor profile at `/etc/apparmor.d/usr.lib.toplogger.toplogger.sh`)
+
+```
+#include <tunables/global>
+
+/usr/lib/toplogger/toplogger.sh {
+    # Include necessary abstractions
+    #include <abstractions/base>
+    
+    # Allow read access to configuration files
+    /etc/toplogger/** r,
+
+    # Allow read & write access to log files
+    /var/log/toplogger/** rw,
+    
+    # Allow execution of the script
+    /usr/lib/toplogger/toplogger.sh ix,
+    
+    # Allow read access to the service file
+    /usr/lib/systemd/system/toplogger.service r,
+    
+    # Deny everything else by default
+    deny /etc/** w,
+    deny /usr/** w,
+    deny /var/** w,
+}
+```
+
 ## Detailed instructions per architecture
 Instructions explain each in detail to create these packages from scratch...
 
@@ -169,7 +203,8 @@ arch/
 ├─ PKGBUILD
 ├─ conf
 ├─ toplogger.service
-└─ toplogger.sh
+├─ toplogger.sh
+└─ usr.lib.toplogger.toplogger.sh
 ```
 
 - Create directory: `arch`
@@ -197,13 +232,15 @@ package() {
   install -Dm755 "$srcdir/$pkgname.sh" "$pkgdir/usr/lib/$pkgname/$pkgname.sh"
   install -Dm644 "$srcdir/$pkgname.service" "$pkgdir/usr/lib/systemd/system/$pkgname.service"
   install -Dm644 "$srcdir/conf" "$pkgdir/etc/$pkgname/conf"
-  
+  install -Dm644 "$srcdir/usr.lib.$pkgname.$pkgname.sh" "$pkgdir/etc/apparmor.d/usr.lib.$pkgname.$pkgname.sh"
+
   echo "/var/log/$pkgname  # Directory where logs are sorted and kept" > "$pkgdir/etc/$pkgname/logdir"
   
 }
+
 ```
 
-- Place files `conf`, `toplogger.sh` & `toplogger.service` in the same directory as `PKGBUILD`
+- Place files `conf`, `toplogger.sh`, `toplogger.service` & `usr.lib.toplogger.toplogger.sh` in the same directory as `PKGBUILD`
 - Build package:
   - Navigate to directory `arch/`
   - Run this, then the package will be built, then installed with `pacman`:
@@ -225,9 +262,13 @@ sudo pacman -U toplogger-1.0.0-1-any.pkg.tar.zst
 
 - Special notes about Arch:
   - `systemctl` cannot enable, start, stop, or disable the service from the package installation
+    - This is an [old problem part of an old discussion](https://superuser.com/questions/688733/)
     - This is because of the way that `pacman` uses `chroot` to install the package
     - The service will need to be enabled, started, stopped, disabled and removed manually *after* the installation or removal
       - `systemctl enable toplogger`, `systemctl start toplogger`, `systemctl stop toplogger`, `systemctl disable toplogger`
+    - The same goes for AppArmor without rebooting
+      - This assumes that AppArmor is even working, which it is not by default on Arch
+      - `apparmor_parser -r /etc/apparmor.d/usr.lib.toplogger.toplogger.sh`, `aa-enforce /etc/apparmor.d/usr.lib.toplogger.toplogger.sh`, `aa-disable /etc/apparmor.d/usr.lib.toplogger.toplogger.sh`
     - This relates to the nature for Arch Linux to be minimalist, part of its appeal to some developers
       - There may be a work-around that includes a "post install" script and "install hook", but it must also disable the service on package removal, making it very complex to have the package manager handle `systemctl` service status changes
       - This is why many Arch Linux system administrators handle both packages and services separately
@@ -244,6 +285,23 @@ sudo pacman -U toplogger-1.0.0-1-any.pkg.tar.zst
   - `PKGBUILD` is the instruction file, not a directory as might be expected with other package builders
   - `makepkg` must be run from the same directory containing `PKGBUILD`
   - The `.pkg.tar.zst` file will appear inside the containing directory
+
+| **Enable & start services** :$
+
+```console
+sudo systemctl enable toplogger
+sudo systemctl start toplogger
+sudo apparmor_parser -r /etc/apparmor.d/usr.lib.toplogger.toplogger.sh
+sudo aa-enforce /etc/apparmor.d/usr.lib.toplogger.toplogger.sh
+```
+
+| **Disable & stop services** :$
+
+```console
+sudo systemctl stop toplogger
+sudo systemctl disable toplogger
+sudo aa-disable /etc/apparmor.d/usr.lib.toplogger.toplogger.sh
+```
 
 | **Remove Arch package** :$ (optional)
 
@@ -279,6 +337,8 @@ deb/
    │     └─ toplogger/
    │        └─ toplogger.sh
    └─ etc/
+      ├─ apparmor.d/
+      │  └─ usr.lib.toplogger.toplogger.sh
       └─ toplogger/
          └─ conf
 ```
@@ -329,6 +389,10 @@ chmod +x /usr/lib/toplogger/toplogger.sh
 systemctl daemon-reload
 systemctl enable toplogger
 systemctl start toplogger
+
+# AppArmor
+apparmor_parser -r /etc/apparmor.d/usr.lib.toplogger.toplogger.sh
+aa-enforce /etc/apparmor.d/usr.lib.toplogger.toplogger.sh
 ```
 
 - In `DEBIAN/` create file: `prerm`
@@ -342,8 +406,12 @@ systemctl start toplogger
 # exit from any errors
 set -e
 
+# Service
 systemctl stop toplogger
 systemctl disable toplogger
+
+# AppArmor
+aa-disable /etc/apparmor.d/usr.lib.toplogger.toplogger.sh
 ```
 
 - In `DEBIAN/` create file: `postrm`
@@ -364,11 +432,13 @@ fi
 
 - Create directories:
   - `deb/toplogger/etc/toplogger/`
+  - `deb/toplogger/apparmor.d/`
   - `deb/toplogger/usr/lib/toplogger/`
   - `deb/toplogger/usr/lib/systemd/system/`
 - Place file `conf` in `deb/toplogger/etc/toplogger/`
 - Place file `toplogger.sh` in `deb/toplogger/usr/lib/toplogger/`
 - Place file `toplogger.service` in `deb/toplogger/usr/lib/systemd/system/`
+- Place file `usr.lib.toplogger.toplogger.sh` in `deb/toplogger/apparmor.d/`
 - Build package:
   - Navigate to directory `deb/`
   - Run this, then the package will be built, then installed:
@@ -432,7 +502,8 @@ rpm/
    └─ SOURCES/
       ├─ conf
       ├─ toplogger.service
-      └─ toplogger.sh
+      ├─ toplogger.sh
+      └─ usr.lib.toplogger.toplogger.sh
 ```
 
 - Create directories: `rpm/rpmbuild/SPECS`
@@ -457,7 +528,7 @@ Service that keeps top logs every minute, per month, in /var/log/toplogger/
 
 %prep
 echo "####################################################
-We are creating the talking penguin RPM installer...
+We are creating the top logger service RPM installer...
 Other commands could go here...
 ####################################################"
 
@@ -468,19 +539,29 @@ Other commands could go here...
 install -Dm755 "$RPM_SOURCE_DIR/toplogger.sh" "$RPM_BUILD_ROOT/usr/lib/toplogger/toplogger.sh"
 install -Dm644 "$RPM_SOURCE_DIR/toplogger.service" "$RPM_BUILD_ROOT/usr/lib/systemd/system/toplogger.service"
 install -Dm644 "$RPM_SOURCE_DIR/conf" "$RPM_BUILD_ROOT/etc/toplogger/conf"
+install -Dm644 "$RPM_SOURCE_DIR/usr.lib.toplogger.toplogger.sh" "$RPM_BUILD_ROOT/etc/apparmor.d/usr.lib.toplogger.toplogger.sh"
 
 echo "/var/log/toplogger  # Directory where logs are sorted and kept" > "$RPM_BUILD_ROOT/etc/toplogger/logdir"
 
 %post
+# Service
 systemctl daemon-reload
 systemctl enable toplogger
 systemctl start toplogger
 
+# AppArmor
+apparmor_parser -r /etc/apparmor.d/usr.lib.toplogger.toplogger.sh
+aa-enforce /etc/apparmor.d/usr.lib.toplogger.toplogger.sh
+
 %preun
 if [ $1 -eq 0 ]; then
+  # Service
   systemctl stop toplogger
   systemctl disable toplogger
   systemctl daemon-reload
+
+  # AppArmor
+  aa-disable /etc/apparmor.d/usr.lib.toplogger.toplogger.sh
 fi
 
 %postun
@@ -491,6 +572,7 @@ fi
 %files
 /usr/lib/toplogger/toplogger.sh
 /usr/lib/systemd/system/toplogger.service
+/etc/apparmor.d/usr.lib.toplogger.toplogger.sh
 
 %config(noreplace)
 /etc/toplogger/conf
@@ -503,7 +585,7 @@ Thu Jan 01 00:00:00 UTC 1970 codes@inkisaverb.com
 ```
 
 - Create directory: `rpm/rpmbuild/SOURCES/`
-- Place files `conf`, `toplogger.sh` & `toplogger.service` in directory `rpm/rpmbuild/SOURCES/`
+- Place files `conf`, `toplogger.sh`, `toplogger.service` & `usr.lib.toplogger.toplogger.sh` in directory `rpm/rpmbuild/SOURCES/`
 - Install the `rpm-build` and `rpmdevtools` packages
 
 | **RedHat/CentOS** :$

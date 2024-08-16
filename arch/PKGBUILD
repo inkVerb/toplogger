@@ -3,7 +3,7 @@ pkgname=toplogger
 pkgver=1.0.0
 pkgrel=1
 pkgdesc="top logs per-minute"
-url="https://github.com/inkVerb/$pkgname"
+url="https://github.com/inkVerb/toplogger"
 arch=('any')
 license=('GPL')
 depends=('systemd')
@@ -17,7 +17,8 @@ package() {
   install -Dm755 "$srcdir/$pkgname.sh" "$pkgdir/usr/lib/$pkgname/$pkgname.sh"
   install -Dm644 "$srcdir/$pkgname.service" "$pkgdir/usr/lib/systemd/system/$pkgname.service"
   install -Dm644 "$srcdir/conf" "$pkgdir/etc/$pkgname/conf"
-  
+  install -Dm644 "$srcdir/usr.lib.$pkgname.$pkgname.sh" "$pkgdir/etc/apparmor.d/usr.lib.$pkgname.$pkgname.sh"
+
   echo "/var/log/$pkgname  # Directory where logs are sorted and kept" > "$pkgdir/etc/$pkgname/logdir"
   
 }

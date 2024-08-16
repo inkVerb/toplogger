@@ -25,19 +25,29 @@ Other commands could go here...
 install -Dm755 "$RPM_SOURCE_DIR/toplogger.sh" "$RPM_BUILD_ROOT/usr/lib/toplogger/toplogger.sh"
 install -Dm644 "$RPM_SOURCE_DIR/toplogger.service" "$RPM_BUILD_ROOT/usr/lib/systemd/system/toplogger.service"
 install -Dm644 "$RPM_SOURCE_DIR/conf" "$RPM_BUILD_ROOT/etc/toplogger/conf"
+install -Dm644 "$RPM_SOURCE_DIR/usr.lib.toplogger.toplogger.sh" "$RPM_BUILD_ROOT/etc/apparmor.d/usr.lib.toplogger.toplogger.sh"
 
 echo "/var/log/toplogger  # Directory where logs are sorted and kept" > "$RPM_BUILD_ROOT/etc/toplogger/logdir"
 
 %post
+# Service
 systemctl daemon-reload
 systemctl enable toplogger
 systemctl start toplogger
 
+# AppArmor
+apparmor_parser -r /etc/apparmor.d/usr.lib.toplogger.toplogger.sh
+aa-enforce /etc/apparmor.d/usr.lib.toplogger.toplogger.sh
+
 %preun
 if [ $1 -eq 0 ]; then
+  # Service
   systemctl stop toplogger
   systemctl disable toplogger
   systemctl daemon-reload
+
+  # AppArmor
+  aa-disable /etc/apparmor.d/usr.lib.toplogger.toplogger.sh
 fi
 
 %postun
@@ -48,6 +58,7 @@ fi
 %files
 /usr/lib/toplogger/toplogger.sh
 /usr/lib/systemd/system/toplogger.service
+/etc/apparmor.d/usr.lib.toplogger.toplogger.sh
 
 %config(noreplace)
 /etc/toplogger/conf
