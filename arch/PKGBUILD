@@ -7,10 +7,23 @@ url="https://github.com/inkVerb/toplogger"
 arch=('any')
 license=('GPL')
 depends=('systemd')
-source=("$pkgname.sh" "$pkgname.service" "conf")
-sha256sums=('SKIP' 'SKIP' 'SKIP')
+source=(
+  "$pkgname.sh"
+  "$pkgname.service"
+  "conf"
+  "usr.lib.$pkgname.$pkgname.sh"
+)
+sha256sums=(
+  '797c547f37068bd2f095200c686eb62a33bf5c25af4c6e36464a4df9f92112bf'
+  '49d9ad5c09f7d87df300528668e2a9d351db3f688672cd754b3c3d8e237471ae'
+  '025f4740485f1e14397c1e526ae9bb1d60eeb2b3a88c58ed8d06e1d34b96b900'
+  '77d6df7c79900c401e7e1c0724d2fdbabf911c371d2bdd96e3656053a5ddc1e3'
+)
 # Preserve when uninstalled, delete when purged
-backup=("etc/$pkgname/conf" "etc/$pkgname/logdir")
+backup=(
+  "etc/$pkgname/conf"
+  "etc/$pkgname/logdir"
+)
 
 package() {
 

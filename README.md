@@ -158,6 +158,7 @@ Description=top logger per-minute
 
 [Service]
 ExecStart=/usr/lib/toplogger/toplogger.sh  # The script
+Restart=always
 
 [Install]
 WantedBy=network.target  # Start looping as soon as the network starts, don't wait for multi-user
@@ -215,6 +216,8 @@ interval_seconds 60  # Must be an integer within 30 to 3600
 ## Detailed instructions per architecture
 Instructions explain each in detail to create these packages from scratch...
 
+*Note `toplogger.sh` and `toplogger.service` contain comments in the above instructions and in the root of this erpo, so their `sha256sum` reflects that in the instructions below; those scripts inside the `arch/`, `deb/` & `rpm/` directories do not have those comments, so their `sha256sum` values are different*
+
 ### I. Arch Linux Package (`toplogger-1.0.0-1-any.pkg.tar.zst`)
 *Arch package directory structure:*
 
@@ -244,10 +247,23 @@ url="https://github.com/inkVerb/toplogger"
 arch=('any')
 license=('GPL')
 depends=('systemd')
-source=("$pkgname.sh" "$pkgname.service" "conf")
-sha256sums=('SKIP' 'SKIP' 'SKIP')
+source=(
+  "$pkgname.sh"
+  "$pkgname.service"
+  "conf"
+  "usr.lib.$pkgname.$pkgname.sh"
+)
+sha256sums=(
+  '1670ffdab75f3af4e2436cff049ed05bc174014764fa98dd1336b0b5a86355f0'
+  '832b461d871e3bf89794714e2d5c257c46b30e6125e20492c4a59e7cb3b66ab6'
+  '025f4740485f1e14397c1e526ae9bb1d60eeb2b3a88c58ed8d06e1d34b96b900'
+  '77d6df7c79900c401e7e1c0724d2fdbabf911c371d2bdd96e3656053a5ddc1e3'
+)
 # Preserve when uninstalled, delete when purged
-backup=("etc/$pkgname/conf" "etc/$pkgname/logdir")
+backup=(
+  "etc/$pkgname/conf"
+  "etc/$pkgname/logdir"
+)
 
 package() {
 
