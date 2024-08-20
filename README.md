@@ -302,6 +302,7 @@ sudo pacman -U toplogger-1.0.0-1-any.pkg.tar.zst
   - `systemctl` cannot enable, start, stop, or disable the service from the package installation
     - This is an [old problem part of an old discussion](https://superuser.com/questions/688733/)
     - This is because of the way that `pacman` uses `chroot` to install the package
+      - This makes similar database management issues with the [**`501webapp`**](https://github.com/inkVerb/501webapp) package
     - The service will need to be enabled, started, stopped, disabled and removed manually *after* the installation or removal
       - `systemctl enable toplogger`, `systemctl start toplogger`, `systemctl stop toplogger`, `systemctl disable toplogger`
     - The same goes for AppArmor without rebooting
@@ -310,6 +311,10 @@ sudo pacman -U toplogger-1.0.0-1-any.pkg.tar.zst
     - This relates to the nature for Arch Linux to be minimalist, part of its appeal to some developers
       - There may be a work-around that includes a "post install" script and "install hook", but it must also disable the service on package removal, making it very complex to have the package manager handle `systemctl` service status changes
       - This is why many Arch Linux system administrators handle both packages and services separately
+    - If we must start the loop, we can start it directly:
+      - The `.service` file's line `ExecStart=` uses the command to start the service directly :# `/usr/lib/toplogger/toplogger.sh`
+      - This is still not as robust as having a `.service` monitor it, such as for `Restart=always`
+      - We could do this with other services as well, but the SysAdmin using `systemctl` directly is probably the best workflow
   - Files in the `backup=` array (in `PKGBUILD`) are handled in a special way on package removal or package upgrade
     - This only affects files that have been changed from those shipped
     - `backup=` files are copied to `.pacsave` files in the same directory on removal
