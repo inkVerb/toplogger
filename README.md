@@ -227,6 +227,7 @@ Instructions explain each in detail to create these packages from scratch...
 arch/
 ├─ PKGBUILD
 ├─ conf
+├─ cleanup.install
 ├─ toplogger.service
 ├─ toplogger.sh
 └─ usr.lib.toplogger.toplogger.sh
@@ -259,6 +260,8 @@ sha256sums=(
   '025f4740485f1e14397c1e526ae9bb1d60eeb2b3a88c58ed8d06e1d34b96b900'
   '77d6df7c79900c401e7e1c0724d2fdbabf911c371d2bdd96e3656053a5ddc1e3'
 )
+# Run the extra script as chroot
+install='cleanup.install'
 # Preserve when uninstalled, delete when purged
 backup=(
   "etc/$pkgname/conf"
@@ -276,6 +279,16 @@ package() {
   
 }
 
+```
+
+- In `arch/` create file: `cleanup.install`
+
+| **`arch/cleanup.install`** : (minimal file contents; included repo file uses full [prototype demo](https://gitlab.archlinux.org/pacman/pacman/raw/master/proto/proto.install))
+
+```
+post_remove() {
+	rm -rf /var/log/toplogger
+}
 ```
 
 - Place files `conf`, `toplogger.sh`, `toplogger.service` & `usr.lib.toplogger.toplogger.sh` in the same directory as `PKGBUILD`
@@ -321,6 +334,9 @@ sudo pacman -U toplogger-1.0.0-1-any.pkg.tar.zst
     - `backup=` files are ignored on a package upgrade
     - This is different from Debian, which will merely ignore the files, not move altered files to backups
       - This relates to the nature for Arch Linux to be minimalist, part of its appeal to some developers
+  - `post_remove()` in `cleanup.install` will always remove the `/var/log/toplogger/` directorywill remove on any `pacman -R` removal
+    - To prevent this, remove or comment the line `install='cleanup.install'` in `PKGBUILD`
+      - This would leave it to the SysAdmin to remove log files in `/var/log/toplogger/`
   - We don't need to use the `-s` flag with `makepkg` this time because of the singular dependency issue
     - The `.service` structure needs `systemd`
     - If `systemd` was not already in use, then it could be SysVinit or Upstart, which `systemd` should conflict with
@@ -404,6 +420,7 @@ Description: top logs per-minute
 ```
 
 - In `DEBIAN/` create file: `conffiles`
+  - This file technically isn't needed because all files in `etc/` are automatically included as `conffiles`; this is here for example
 
 | **`deb/toplogger/DEBIAN/conffiles`** : (retain these `/etc/` configs on package removal)
 
@@ -470,6 +487,7 @@ set -e
 
 if [ "$1" = "purge" ]; then
   rm -rf /etc/toplogger
+  rm -rf /var/log/toplogger
 fi
 ```
 
@@ -511,6 +529,7 @@ sudo dpkg -i toplogger.deb  # Install the package
     - Only files that reside within the package can be listed here
     - The only config file allowed in `conffiles` is `/etc/toplogger/conf`
     - `/etc/toplogger/logdir` is created via `echo`, not residing in the package, so it can't be listed in `conffiles`
+    - `postrm` will only remove the `/var/log/toplogger/` directory on a `--purge`; Arch and RPM will remove it on any `remove` action
   - The script file at `usr/lib/toplogger/toplogger.sh` does not need to be executable
     - This is because this installer uses a `postinst` script
     - This script will set the permissions in the command `chmod +x /usr/lib/toplogger/toplogger.sh`
@@ -610,6 +629,7 @@ fi
 %postun
 if [ $1 -eq 0 ]; then
   rm -rf /etc/toplogger
+  rm -rf /var/log/toplogger
 fi
 
 %files
@@ -676,6 +696,8 @@ sudo rpm -i ~/rpmbuild/RPMS/noarch/toplogger-1.0.0-1.noarch.rpm  # Install the p
     - Configs listed in the `.spec` file under `%config(noreplace)` have no guarantee of being preserved on package removal
       - These are listed here to protect them during package updates, not package removal
     - To overwrite preserved configs on a re-install, use `install -f` for "force" when installing again
+    - `%postun` will also remove the `/var/log/toplogger/` directory on any remove
+      - To prevent this, comment or remove the line `rm -rf /var/log/toplogger` under `%postun` in `toplogger.spec`
   - The `%changelog` is for OpenSUSE's `zypper`
     - RedHat/CentOS may want the date line like this:
       - `* Thu Jan 01 1970 Ink Is A Verb <codes@inkisaverb.com> - 1.0.0-1`

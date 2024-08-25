@@ -53,6 +53,7 @@ fi
 %postun
 if [ $1 -eq 0 ]; then
   rm -rf /etc/toplogger
+  rm -rf /var/log/toplogger
 fi
 
 %files

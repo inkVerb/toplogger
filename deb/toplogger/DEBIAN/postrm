@@ -3,4 +3,5 @@ set -e
 
 if [ "$1" = "purge" ]; then
     rm -rf /etc/toplogger
+    rm -rf /var/log/toplogger
 fi

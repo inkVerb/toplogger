@@ -19,6 +19,8 @@ sha256sums=(
   '025f4740485f1e14397c1e526ae9bb1d60eeb2b3a88c58ed8d06e1d34b96b900'
   '77d6df7c79900c401e7e1c0724d2fdbabf911c371d2bdd96e3656053a5ddc1e3'
 )
+# Run the extra script as chroot
+install='cleanup.install'
 # Preserve when uninstalled, delete when purged
 backup=(
   "etc/$pkgname/conf"
