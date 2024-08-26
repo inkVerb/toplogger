@@ -66,6 +66,5 @@ fi
 /etc/toplogger/logdir
 
 %changelog
--------------------------------------------------------------------
-Thu Jan 01 00:00:00 UTC 1970 codes@inkisaverb.com
+* Thu Jan 01 1970 Ink Is A Verb <codes@inkisaverb.com> - 1.0.0-1
 - Something started, probably with v1.0.0-1

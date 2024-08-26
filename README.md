@@ -642,8 +642,7 @@ fi
 /etc/toplogger/logdir
 
 %changelog
--------------------------------------------------------------------
-Thu Jan 01 00:00:00 UTC 1970 codes@inkisaverb.com
+* Thu Jan 01 1970 Ink Is A Verb <codes@inkisaverb.com> - 1.0.0-1
 - Something started, probably with v1.0.0-1
 ```
 
@@ -698,9 +697,7 @@ sudo rpm -i ~/rpmbuild/RPMS/noarch/toplogger-1.0.0-1.noarch.rpm  # Install the p
     - To overwrite preserved configs on a re-install, use `install -f` for "force" when installing again
     - `%postun` will also remove the `/var/log/toplogger/` directory on any remove
       - To prevent this, comment or remove the line `rm -rf /var/log/toplogger` under `%postun` in `toplogger.spec`
-  - The `%changelog` is for OpenSUSE's `zypper`
-    - RedHat/CentOS may want the date line like this:
-      - `* Thu Jan 01 1970 Ink Is A Verb <codes@inkisaverb.com> - 1.0.0-1`
+  - If you get `changelog` or `bad date` error, then consider yourself normal
 
 | **Remove RedHat/CentOS package** :$ (optional)
 
