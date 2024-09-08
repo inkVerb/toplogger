@@ -318,6 +318,9 @@ sudo pacman -U toplogger-1.0.0-1-any.pkg.tar.zst
       - This makes similar database management issues with the [**`501webapp`**](https://github.com/inkVerb/501webapp) package
     - The service will need to be enabled, started, stopped, disabled and removed manually *after* the installation or removal
       - `systemctl enable toplogger`, `systemctl start toplogger`, `systemctl stop toplogger`, `systemctl disable toplogger`
+    - This could be partially overcome by creating the `systemctl enable` symlink manually, eg the Nginx installer outputs:
+      - `Created symlink '/etc/systemd/system/multi-user.target.wants/nginx.service' -> '/usr/lib/systemd/system/nginx.service'.`
+      - We won't do this for this simple example here because this requires an advanced understanding of `systemd` services before manually creating such a service symlink inside a package manager
     - The same goes for AppArmor without rebooting
       - This assumes that AppArmor is even working, which it is not by default on Arch
       - `apparmor_parser -r /etc/apparmor.d/usr.lib.toplogger.toplogger.sh`, `aa-enforce /etc/apparmor.d/usr.lib.toplogger.toplogger.sh`, `aa-disable /etc/apparmor.d/usr.lib.toplogger.toplogger.sh`
